@@ -2,7 +2,7 @@
 
 namespace Sober\Intervention\Application;
 
-use Sober\Intervention\Application\Support\Element;
+use Sober\Intervention\Application\OptionsApi;
 use Sober\Intervention\Support\Arr;
 use Sober\Intervention\Support\Str;
 
@@ -14,7 +14,6 @@ use Sober\Intervention\Support\Str;
  * @since 2.0.0
  *
  * @link https://developer.wordpress.org/reference/hooks/init/
- * @link https://developer.wordpress.org/reference/functions/update_option/
  * @link https://wordpress.org/support/article/roles-and-capabilities/
  * @link https://gist.github.com/mj1856/f0eaa302d56cd7b3dd3e
  * @link https://www.php.net/manual/en/datetime.formats.date.php
@@ -28,6 +27,7 @@ use Sober\Intervention\Support\Str;
  *     'general.wp-address' => (string) $wp_url,
  *     'general.site-address' => (string) $site_url,
  *     'general.admin-email' => (string) $admin_email,
+ *     'general.admin-email.verification' => (boolean|int) $email_verification,
  *     'general.email-from' => (string) $email_from,
  *     'general.email-from-name' => (string) $email_from_name,
  *     'general.membership' => (boolean) $enable_membership,
@@ -42,6 +42,7 @@ use Sober\Intervention\Support\Str;
 class General
 {
     protected $config;
+    protected $api;
 
     /**
      * Initialize
@@ -51,6 +52,7 @@ class General
     public function __construct($config = false)
     {
         $this->config = Arr::normalize($config);
+        $this->api = OptionsApi::set($this->config);
         $this->hook();
     }
 
@@ -60,7 +62,7 @@ class General
     protected function hook()
     {
         add_action('init', [$this, 'options']);
-        add_action('admin_head-options-general.php', [$this, 'admin']);
+        add_action('admin_head-options-general.php', [$this->api, 'disableKeys']);
     }
 
     /**
@@ -68,24 +70,31 @@ class General
      */
     public function options()
     {
-        if ($this->config->has('general.site-title')) {
-            update_option('blogname', $this->config->get('general.site-title'));
-        }
+        $this->api->saveKeys([
+            'general.site-title',
+            'general.tagline',
+            'general.wp-address',
+            'general.site-address',
+            'general.admin-email',
+            'general.membership',
+            'general.default-role',
+            'general.timezone',
+            'general.date-format',
+            'general.time-format',
+        ]);
 
-        if ($this->config->has('general.tagline')) {
-            update_option('blogdescription', $this->config->get('general.tagline'));
-        }
-
-        if ($this->config->has('general.wp-address')) {
-            update_option('siteurl', $this->config->get('general.wp-address'));
-        }
-
-        if ($this->config->has('general.site-address')) {
-            update_option('home', $this->config->get('general.site-address'));
-        }
-
+        // disable login email verification screen
         if ($this->config->has('general.admin-email')) {
-            update_option('admin_email', $this->config->get('general.admin-email'));
+            add_filter('admin_email_check_interval', '__return_false');
+        }
+
+        // only show login email verification screen if `general.admin-email` is not set
+        if ($this->config->has('general.admin-email.verification') && !$this->config->has('general.admin-email')) {
+            $value = $this->config->get('general.admin-email.verification');
+
+            add_filter('admin_email_check_interval', function () use ($value) {
+                return $value;
+            });
         }
 
         if ($this->config->has('general.email-from')) {
@@ -100,26 +109,6 @@ class General
             add_filter('wp_mail_from_name', function () {
                 return $from_name;
             });
-        }
-
-        if ($this->config->has('general.membership')) {
-            update_option('users_can_register', $this->config->get('general.membership'));
-        }
-
-        if ($this->config->has('general.default-role')) {
-            update_option('default_role', $this->config->get('general.default-role'));
-        }
-
-        if ($this->config->has('general.timezone')) {
-            update_option('timezone_string', $this->config->get('general.timezone'));
-        }
-
-        if ($this->config->has('general.date-format')) {
-            update_option('date_format', $this->config->get('general.date-format'));
-        }
-
-        if ($this->config->has('general.time-format')) {
-            update_option('time_format', $this->config->get('general.time-format'));
         }
 
         if ($this->config->has('general.week-starts')) {
@@ -141,12 +130,12 @@ class General
                 'sat' => 6,
             ];
 
-            // Return value of array item
+            // return value of array item
             if (is_string($day) && isset($days[$day])) {
                 $day = $days[$day];
             }
 
-            update_option('start_of_week', $day);
+            $this->api->save('general.week-starts', $day);
         }
 
         if ($this->config->has('general.language')) {
@@ -159,60 +148,6 @@ class General
             }
 
             switch_to_locale($general_language);
-        }
-    }
-
-    /**
-     * Admin
-     */
-    public function admin()
-    {
-        if ($this->config->has('general.site-title')) {
-            Element::disabled('#blogname');
-        }
-
-        if ($this->config->has('general.tagline')) {
-            Element::disabled('#blogdescription');
-        }
-
-        if ($this->config->has('general.wp-address')) {
-            Element::disabled('#siteurl');
-        }
-
-        if ($this->config->has('general.site-address')) {
-            Element::disabled('#home');
-        }
-
-        if ($this->config->has('general.admin-email')) {
-            Element::disabled('#new_admin_email');
-        }
-
-        if ($this->config->has('general.membership')) {
-            Element::disabled('#users_can_register');
-        }
-
-        if ($this->config->has('general.default-role')) {
-            Element::disabled('#default_role');
-        }
-
-        if ($this->config->has('general.timezone')) {
-            Element::disabled('#timezone_string');
-        }
-
-        if ($this->config->has('general.date-format')) {
-            Element::disabled('input[name=date_format], #date_format_custom');
-        }
-
-        if ($this->config->has('general.time-format')) {
-            Element::disabled('input[name=time_format], #time_format_custom');
-        }
-
-        if ($this->config->has('general.week-starts')) {
-            Element::disabled('#start_of_week');
-        }
-
-        if ($this->config->has('general.language')) {
-            Element::disabled('#WPLANG');
         }
     }
 }

@@ -19,7 +19,7 @@ $ wp plugin install https://github.com/soberwp/intervention/archive/master.zip -
 
 #### Requirements
 
-* [PHP](http://php.net/manual/en/install.php) >= 7.0.0
+* [PHP](http://php.net/manual/en/install.php) >= 7.4.0
 
 ## Usage
 
@@ -235,7 +235,9 @@ Includes support for github-updater to track updates through wp-admin.
 
 ## Roadmap
 
-* Better visual documentation.
+* Export database values to Intervention config file.
+* Save to database manual option (`update_option` vs `pre_option`).
+* Intervention wp-admin interface.
 * Better support for the block editor.
 * Support `wp-admin` custom post types.
 
